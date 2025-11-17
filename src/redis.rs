@@ -109,17 +109,24 @@ impl Redis {
         self.conn_manager.clone()
     }
 
-    pub(crate) async fn get(&self, key: &str) -> redis::RedisResult<Option<String>> {
-        self.connection().get(key).await
+    async fn invalidate(&self, key: &str) -> Result<()> {
+        self.connection().del(key).await.map_err(|e| e.into())
     }
 
-    pub(crate) async fn store(&self, key: &str, value: String) -> redis::RedisResult<()> {
+    async fn get(&self, key: &str) -> Result<Option<String>> {
+        self.connection().get(key).await.map_err(|e| e.into())
+    }
+
+    async fn store_with_expiry(&self, key: &str, value: &str) -> Result<()> {
         let mut connection = self.connection();
 
         if let Some(expiry) = self.expiry {
-            connection.set_ex(key, value, expiry).await
+            connection
+                .set_ex(key, value, expiry)
+                .await
+                .map_err(|e| e.into())
         } else {
-            connection.set(key, value).await
+            connection.set(key, value).await.map_err(|e| e.into())
         }
     }
 
@@ -194,7 +201,7 @@ impl Redis {
             .map_err(|e| e.into())
     }
 
-    pub(crate) async fn store_struct(&self, key: &str, value: impl Serialize) -> Result<()> {
+    pub(crate) async fn store_enrichment(&self, key: &str, value: impl Serialize) -> Result<()> {
         let value = match serde_json::to_string(&value) {
             Ok(value) => value,
             Err(e) => {
@@ -202,13 +209,10 @@ impl Redis {
                 return Err(Error::msg(format!("Failed to serialize value: {}", e)));
             }
         };
-        self.store(key, value).await.map_err(|e| e.into())
-    }
-    pub(crate) async fn invalidate(&self, key: &str) -> redis::RedisResult<()> {
-        self.connection().del(key).await
+        self.store_with_expiry(key, value.as_str()).await
     }
 
-    pub(crate) async fn get_structs<T>(&self, keys: Vec<String>) -> Result<Vec<T>>
+    pub(crate) async fn get_enrichments<T>(&self, keys: Vec<String>) -> Result<Vec<T>>
     where
         T: for<'de> Deserialize<'de>,
     {
@@ -235,26 +239,39 @@ impl Redis {
             Err(e) => Err(e.into()),
         }
     }
-
-    pub(crate) async fn get_keys(&self, pattern: &str) -> redis::RedisResult<Vec<String>> {
-        self.connection().keys(pattern).await
+    pub(crate) async fn get_image_enrichments(&self, image_id: &str) -> Result<Vec<String>> {
+        let pattern = format!("enriched:{}:*", image_id);
+        self.connection().keys(pattern).await.map_err(|e| e.into())
     }
 
-    pub(crate) async fn store_phash(&self, id: &str, phash: Vec<u8>) -> redis::RedisResult<()> {
-        let key = format!("image:{}", id);
+    pub(crate) async fn get_image_url(&self, image_id: &str) -> Result<Option<String>> {
+        self.get(format!("url:{}", image_id).as_str()).await
+    }
+
+    pub(crate) async fn set_image_url(&self, image_id: &str, url: &str) -> Result<()> {
+        self.store_with_expiry(format!("url:{}", image_id).as_str(), url)
+            .await
+    }
+
+    pub(crate) async fn store_image_hash(&self, image_id: &str, image_hash: Vec<u8>) -> Result<()> {
+        let key = format!("image:{}", image_id);
         if let Some(expiry) = self.expiry {
             let expiry =
                 HashFieldExpirationOptions::default().set_expiration(SetExpiry::EX(expiry));
 
             self.connection()
-                .hset_ex(&key, &expiry, &[("payload", phash)])
+                .hset_ex(&key, &expiry, &[("payload", image_hash)])
                 .await
+                .map_err(|e| e.into())
         } else {
-            self.connection().hset(&key, "payload", phash).await
+            self.connection()
+                .hset(&key, "payload", image_hash)
+                .await
+                .map_err(|e| e.into())
         }
     }
 
-    pub(crate) async fn find_similar(&self, query_phash: &[u8]) -> Result<Vec<(String, u32)>> {
+    pub(crate) async fn find_similar_image(&self, image_hash: &[u8]) -> Result<Vec<(String, u32)>> {
         let config = get_config();
         let threshold = config.cache.phash_max_distance.unwrap();
         let max_results = config.cache.max_search_results.unwrap();
@@ -265,7 +282,7 @@ impl Redis {
             .arg(HASH_INDEX)
             .arg("*")
             .arg("PAYLOAD")
-            .arg(query_phash)
+            .arg(image_hash)
             .arg("SCORER")
             .arg("HAMMING")
             .arg("WITHSCORES")

@@ -26,20 +26,8 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
     };
 
     log::debug!("Getting keys for cached results for image {}", image_id);
-    let keys = match redis
-        .get_keys(format!("enriched:{}:*", image_id).as_str())
-        .await
-    {
-        Ok(keys) => {
-            if keys.is_empty() {
-                return Err(Error::msg(format!(
-                    "No cached results for image: {}",
-                    image_id
-                )));
-            }
-            log::debug!("Found {} cached results for image {}", keys.len(), image_id);
-            keys
-        }
+    let keys = match redis.get_image_enrichments(&image_id).await {
+        Ok(keys) => keys,
         Err(e) => {
             log::warn!(
                 "Failed to get keys for cached results for image {}: {}",
@@ -50,8 +38,16 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
         }
     };
 
+    if keys.is_empty() {
+        return Err(Error::msg(format!(
+            "No cached results for image: {}",
+            image_id
+        )));
+    }
+    log::debug!("Found {} cached results for image {}", keys.len(), image_id);
+
     log::debug!("Getting cached results for image {}", image_id);
-    let enriched = match redis.get_structs::<Enrichment>(keys).await {
+    let enriched = match redis.get_enrichments::<Enrichment>(keys).await {
         Ok(enriched) => enriched,
         Err(e) => {
             log::warn!("Failed to get cached results for image {}: {}", image_id, e);
@@ -60,7 +56,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
     };
 
     log::debug!("Sending search keyboard for image {}", image_id);
-    match redis.get(format!("url:{}", image_id).as_str()).await {
+    match redis.get_image_url(&image_id).await {
         Ok(Some(url)) => {
             if let Err(e) = send_search_keyboard(bot, msg, url.as_str()).await {
                 log::error!("Failed to send search keyboard {}", e);
@@ -197,7 +193,7 @@ pub(crate) async fn search(
                     && let Some(image_id) = &image_id
                 {
                     let key = format!("enriched:{}:{}", image_id, get_timestamp());
-                    match redis.store_struct(key.as_str(), &enrichment).await {
+                    match redis.store_enrichment(key.as_str(), &enrichment).await {
                         Err(e) => {
                             log::warn!("Could not cache enrichment for image {}: {}", image_id, e);
                         }

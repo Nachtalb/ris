@@ -121,7 +121,7 @@ async fn get_or_store_similar_image(
     new_image_id: &str,
     image_hash: Vec<u8>,
 ) -> Result<(String, bool)> {
-    match redis.find_similar(&image_hash).await {
+    match redis.find_similar_image(&image_hash).await {
         Ok(similar_images) => {
             if let Some((id, distance)) = similar_images.first() {
                 log::info!("Found similar image with distance of: {}", distance);
@@ -134,7 +134,7 @@ async fn get_or_store_similar_image(
     };
 
     log::info!("No similar image found - storing current image");
-    match redis.store_phash(new_image_id, image_hash).await {
+    match redis.store_image_hash(new_image_id, image_hash).await {
         Ok(_) => Ok((new_image_id.to_string(), false)),
         Err(e) => {
             log::error!("Failed to store image hash: {}", e);
@@ -196,7 +196,7 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         Ok(url) => {
             if let Some(redis) = &redis
                 && let Err(e) = redis
-                    .store(format!("url:{}", new_image_id).as_str(), url.clone())
+                    .set_image_url(new_image_id.as_str(), url.as_str())
                     .await
             {
                 log::warn!("Failed to store image url in redis: {}", e);
@@ -216,7 +216,9 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         return Ok(());
     } else if let Some(redis) = redis
         && let Some(image_hash) = image_hash
-        && let Err(e) = redis.store_phash(new_image_id.as_str(), image_hash).await
+        && let Err(e) = redis
+            .store_image_hash(new_image_id.as_str(), image_hash)
+            .await
     {
         log::warn!("Could not store new image in cache {}", e);
         search(&bot, &msg, &file_url, None).await?;
