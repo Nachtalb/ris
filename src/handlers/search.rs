@@ -17,6 +17,7 @@ use teloxide::prelude::*;
 
 pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) -> Result<()> {
     log::debug!("Cached search for image {}", image_id);
+
     let redis = match get_redis().await {
         Some(redis) => redis,
         None => {
@@ -34,7 +35,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
                 image_id,
                 e
             );
-            return Err(Error::from(e));
+            return Err(e);
         }
     };
 
@@ -55,21 +56,6 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
         }
     };
 
-    log::debug!("Sending search keyboard for image {}", image_id);
-    match redis.get_image_url(&image_id).await {
-        Ok(Some(url)) => {
-            if let Err(e) = send_search_keyboard(bot, msg, url.as_str()).await {
-                log::error!("Failed to send search keyboard {}", e);
-            }
-        }
-        Ok(None) => {
-            log::warn!("No url found for image {}", image_id);
-        }
-        Err(e) => {
-            log::warn!("Failed to get url for image {}: {}", image_id, e);
-        }
-    }
-
     if enriched.is_empty() {
         log::debug!("No cached results found for image {}", image_id);
     } else {
@@ -88,7 +74,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
     Ok(())
 }
 
-async fn send_search_keyboard(bot: &Bot, msg: &Message, url: &str) -> Result<Message> {
+pub async fn send_search_keyboard(bot: &Bot, msg: &Message, url: &str) -> Result<Message> {
     let chat_lang = get_chat_lang(LangSource::Message(msg)).await;
     let keyboard =
         teloxide::types::InlineKeyboardMarkup::new(search_buttons(url, chat_lang.as_str()));
@@ -105,30 +91,12 @@ pub(crate) async fn search(
     url: &str,
     image_id: Option<String>,
 ) -> Result<()> {
-    send_search_keyboard(bot, msg, url).await?;
     let redis = if image_id.is_some() {
         get_redis().await
     } else {
         &None
     };
     let config = get_config();
-
-    if config.general.empty_search_limit.unwrap() > 0
-        && let Some(redis) = redis
-    {
-        match redis.get_no_result_count(msg.chat.id.0).await {
-            Ok(num) => {
-                if num > config.general.empty_search_limit.unwrap() as i64 {
-                    log::debug!(
-                        "Won't search, as no result count {} is higher than threshold",
-                        num
-                    );
-                    return Ok(());
-                }
-            }
-            Err(e) => log::error!("Failed to get no result count: {}", e),
-        }
-    }
 
     log::debug!("Sent search for image to chat {}", msg.chat.id);
     let mut rx = crate::core::orchestrator::reverse_search(url.to_string()).await;
@@ -155,6 +123,8 @@ pub(crate) async fn search(
         }
     }
 
+    let auto_search_limit = config.general.empty_search_limit.unwrap_or(0);
+
     if handles.is_empty() {
         log::debug!("No enrichments found");
         if let Some(redis) = redis {
@@ -162,7 +132,7 @@ pub(crate) async fn search(
                 Ok(num) => {
                     log::debug!("Incremented no result count to {}", num);
 
-                    if num > config.general.empty_search_limit.unwrap() as i64 {
+                    if auto_search_limit > 0 && num > auto_search_limit {
                         let chat_lang = get_chat_lang(LangSource::Message(msg)).await;
                         if let Err(e) = bot
                             .send_message(

@@ -1,12 +1,12 @@
 use crate::error::Errors;
 use crate::files::image::get_image_hash;
 use crate::redis::{Redis, get_redis};
-use crate::utils::{LangSource, get_chat_lang, get_timestamp};
+use crate::utils::{LangSource, get_chat_lang, get_timestamp, is_auto_search_on};
 use std::path::PathBuf;
 use std::thread;
 use teloxide::types::FileId;
 
-use crate::handlers::search::{cached_search, search};
+use crate::handlers::search::{cached_search, search, send_search_keyboard};
 use crate::{files, transformers};
 use anyhow::{Error, Result};
 
@@ -116,11 +116,7 @@ async fn get_media_type(msg: &Message) -> Result<(MediaType, FileId, Option<Stri
     Ok((media_type, file_id, extension))
 }
 
-async fn get_or_store_similar_image(
-    redis: &Redis,
-    new_image_id: &str,
-    image_hash: Vec<u8>,
-) -> Result<(String, bool)> {
+async fn get_or_store_similar_image(redis: &Redis, image_hash: Vec<u8>) -> Result<(String, bool)> {
     match redis.find_similar_image(&image_hash).await {
         Ok(similar_images) => {
             if let Some((id, distance)) = similar_images.first() {
@@ -133,12 +129,16 @@ async fn get_or_store_similar_image(
         }
     };
 
+    let new_image_id = get_timestamp().to_string();
     log::info!("No similar image found - storing current image");
-    match redis.store_image_hash(new_image_id, image_hash).await {
-        Ok(_) => Ok((new_image_id.to_string(), false)),
+    match redis
+        .store_image_hash(new_image_id.as_str(), image_hash)
+        .await
+    {
+        Ok(_) => Ok((new_image_id, false)),
         Err(e) => {
             log::error!("Failed to store image hash: {}", e);
-            Err(anyhow::Error::from(e))
+            Err(e)
         }
     }
 }
@@ -164,46 +164,8 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         }
     };
 
-    let redis = get_redis().await;
-    log::debug!("Redis initialized");
-
-    let new_image_id = get_timestamp().to_string();
-    let image_hash: Option<Vec<u8>> = match get_image_hash(downloaded_file.to_str().unwrap()).await
-    {
-        Ok(hash) => Some(hash),
-        Err(e) => {
-            log::warn!("Failed to get image hash for {:?}: {}", downloaded_file, e);
-            None
-        }
-    };
-
-    if let Some(image_hash) = &image_hash
-        && let Some(redis) = &redis
-    {
-        match get_or_store_similar_image(redis, &new_image_id, image_hash.clone()).await {
-            Ok((_, false)) => {
-                log::info!("No similar image found - stored current image");
-            }
-            Ok((cached_image_id, true)) => match cached_search(&bot, &msg, cached_image_id).await {
-                Ok(_) => return Ok(()),
-                Err(e) => log::error!("Failed to send cached search results: {}", e),
-            },
-            Err(e) => log::warn!("Failed to search redis for similar images: {}", e),
-        }
-    }
-
-    let file_url = match files::get_file_url(downloaded_file).await {
-        Ok(url) => {
-            if let Some(redis) = &redis
-                && let Err(e) = redis
-                    .set_image_url(new_image_id.as_str(), url.as_str())
-                    .await
-            {
-                log::warn!("Failed to store image url in redis: {}", e);
-            }
-
-            url
-        }
+    let file_url = match files::get_file_url(downloaded_file.clone()).await {
+        Ok(url) => url,
         Err(e) => {
             log::error!("Failed to get file url: {}", e);
             send_error_message(&bot, &msg).await?;
@@ -211,21 +173,42 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         }
     };
 
-    if image_hash.is_none() {
-        search(&bot, &msg, &file_url, None).await?;
-        return Ok(());
-    } else if let Some(redis) = redis
-        && let Some(image_hash) = image_hash
-        && let Err(e) = redis
-            .store_image_hash(new_image_id.as_str(), image_hash)
-            .await
-    {
-        log::warn!("Could not store new image in cache {}", e);
-        search(&bot, &msg, &file_url, None).await?;
-        return Ok(());
+    send_search_keyboard(&bot, &msg, file_url.as_str()).await?;
+
+    match is_auto_search_on(msg.chat.id.0).await {
+        Ok(true) => log::debug!("Auto search is on"),
+        Ok(false) => {
+            log::debug!("Auto search is off");
+            return Ok(());
+        }
+        Err(e) => {
+            log::error!("Failed to get auto search status: {}", e);
+            return Err(e);
+        }
     }
 
-    search(&bot, &msg, &file_url, Some(new_image_id)).await?;
+    let redis = match get_redis().await {
+        Some(redis) => redis,
+        None => {
+            search(&bot, &msg, &file_url, None).await?;
+            return Ok(());
+        }
+    };
+    log::debug!("Redis initialized");
+
+    match get_image_hash(downloaded_file.to_str().unwrap()).await {
+        Ok(hash) => match get_or_store_similar_image(redis, hash.clone()).await {
+            Ok((_, false)) => log::info!("No similar image found - stored current image"),
+            Ok((cached_image_id, true)) => match cached_search(&bot, &msg, cached_image_id).await {
+                Ok(_) => return Ok(()),
+                Err(e) => log::error!("Failed to send cached search results: {}", e),
+            },
+            Err(e) => log::warn!("Failed to search redis for similar images: {}", e),
+        },
+        Err(e) => log::warn!("Failed to get image hash for {:?}: {}", downloaded_file, e),
+    }
+    search(&bot, &msg, &file_url, None).await?;
+
     Ok(())
 }
 

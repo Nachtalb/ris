@@ -25,10 +25,11 @@ pub(crate) struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) languages: Option<String>,
 
-    /// Stop auto searching after N empty results. Set to 0 to disable, max 255 (default: 5)
+    /// Stop auto searching after N empty results. Set to -1 to disable auto searching, set to 0 to
+    /// always search (default: 5)
     #[arg(long, env = "RIS_EMPTY_SEARCH_LIMIT")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub empty_search_limit: Option<u8>,
+    pub empty_search_limit: Option<i8>,
 
     /// Worker Num (default: number of CPUs * 2)
     #[arg(short, long, env = "RIS_WORKER_NUM")]

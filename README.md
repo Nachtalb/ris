@@ -38,9 +38,9 @@
   - [x] Document Video
   - [x] Animation (GIF)
 - [ ] Webhook mode
-- [ ] "Auto Search" preference
+- [x] "Auto Search" preference
   - [x] Automatic "Auto Search" shut off on spam
-  - [ ] Manual override
+  - [x] Manual override
 - [x] 🆕 Multilanguage support
   - [x] English
   - [x] Russian

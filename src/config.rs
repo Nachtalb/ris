@@ -35,9 +35,10 @@ pub struct General {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub languages: Option<Vec<Language>>,
 
-    /// Stop auto searching after N empty results. Set to 0 to disable, max 255 (default: 5)
+    /// Stop auto searching after N empty results. Set to -1 to disable auto search, 0 to always
+    /// search, default: 5
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub empty_search_limit: Option<u8>,
+    pub empty_search_limit: Option<i8>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

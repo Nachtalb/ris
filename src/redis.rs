@@ -113,23 +113,6 @@ impl Redis {
         self.connection().del(key).await.map_err(|e| e.into())
     }
 
-    async fn get(&self, key: &str) -> Result<Option<String>> {
-        self.connection().get(key).await.map_err(|e| e.into())
-    }
-
-    async fn store_with_expiry(&self, key: &str, value: &str) -> Result<()> {
-        let mut connection = self.connection();
-
-        if let Some(expiry) = self.expiry {
-            connection
-                .set_ex(key, value, expiry)
-                .await
-                .map_err(|e| e.into())
-        } else {
-            connection.set(key, value).await.map_err(|e| e.into())
-        }
-    }
-
     async fn store_user_data<T: ToRedisArgs + Sync + Send>(
         &self,
         chat_id: i64,
@@ -176,7 +159,7 @@ impl Redis {
             .await
     }
 
-    pub(crate) async fn get_no_result_count(&self, chat_id: i64) -> Result<i64> {
+    pub(crate) async fn get_no_result_count(&self, chat_id: i64) -> Result<i8> {
         match self.get_user_data(chat_id, "no_result_count").await {
             Ok(Some(count)) => Ok(count),
             Ok(None) => Ok(0),
@@ -184,18 +167,18 @@ impl Redis {
         }
     }
 
-    pub(crate) async fn set_no_result_count(&self, chat_id: i64, count: i64) -> Result<()> {
+    pub(crate) async fn set_no_result_count(&self, chat_id: i64, count: i8) -> Result<()> {
         self.store_user_data(chat_id, "no_result_count", count)
             .await
     }
 
-    pub(crate) async fn inc_no_result_count(&self, chat_id: i64) -> Result<i64> {
+    pub(crate) async fn inc_no_result_count(&self, chat_id: i64) -> Result<i8> {
         let key = format!("chat:{}", chat_id);
         let mut con = self.connection();
         redis::cmd("HINCRBY")
             .arg(&key)
             .arg("no_result_count")
-            .arg(1i64)
+            .arg(1i8)
             .query_async(&mut con)
             .await
             .map_err(|e| e.into())
@@ -209,7 +192,17 @@ impl Redis {
                 return Err(Error::msg(format!("Failed to serialize value: {}", e)));
             }
         };
-        self.store_with_expiry(key, value.as_str()).await
+        if let Some(expiry) = self.expiry {
+            self.connection()
+                .set_ex(key, value, expiry)
+                .await
+                .map_err(|e| e.into())
+        } else {
+            self.connection()
+                .set(key, value)
+                .await
+                .map_err(|e| e.into())
+        }
     }
 
     pub(crate) async fn get_enrichments<T>(&self, keys: Vec<String>) -> Result<Vec<T>>
@@ -242,15 +235,6 @@ impl Redis {
     pub(crate) async fn get_image_enrichments(&self, image_id: &str) -> Result<Vec<String>> {
         let pattern = format!("enriched:{}:*", image_id);
         self.connection().keys(pattern).await.map_err(|e| e.into())
-    }
-
-    pub(crate) async fn get_image_url(&self, image_id: &str) -> Result<Option<String>> {
-        self.get(format!("url:{}", image_id).as_str()).await
-    }
-
-    pub(crate) async fn set_image_url(&self, image_id: &str, url: &str) -> Result<()> {
-        self.store_with_expiry(format!("url:{}", image_id).as_str(), url)
-            .await
     }
 
     pub(crate) async fn store_image_hash(&self, image_id: &str, image_hash: Vec<u8>) -> Result<()> {

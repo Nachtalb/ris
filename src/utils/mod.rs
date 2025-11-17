@@ -1,5 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub(crate) mod chat;
 pub(crate) mod keyboard;
 pub(crate) mod locale;
 
@@ -10,4 +11,5 @@ pub(crate) fn get_timestamp() -> u128 {
         .as_nanos()
 }
 
+pub(crate) use chat::is_auto_search_on;
 pub(crate) use locale::{LangSource, get_chat_lang, set_chat_lang};
