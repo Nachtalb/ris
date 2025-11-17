@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use anyhow::{Error, Result};
 use redis::{
-    AsyncCommands, Client, HashFieldExpirationOptions, SetExpiry, Value,
+    AsyncCommands, Client, FromRedisValue, HashFieldExpirationOptions, SetExpiry, ToRedisArgs,
+    Value,
     aio::{ConnectionLike, ConnectionManager, ConnectionManagerConfig},
     cmd,
 };
@@ -122,52 +123,63 @@ impl Redis {
         }
     }
 
-    pub(crate) async fn get_locale(&self, chat_id: i64) -> Result<Option<String>> {
+    async fn store_user_data<T: ToRedisArgs + Sync + Send>(
+        &self,
+        chat_id: i64,
+        field: &str,
+        value: T,
+    ) -> Result<()> {
         let key = format!("chat:{}", chat_id);
         self.connection()
-            .hget(&key, "lang")
+            .hset(&key, field, value)
             .await
             .map_err(|e| e.into())
+    }
+
+    async fn get_user_data<T: FromRedisValue>(
+        &self,
+        chat_id: i64,
+        field: &str,
+    ) -> Result<Option<T>> {
+        let key = format!("chat:{}", chat_id);
+        self.connection()
+            .hget(&key, field)
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn get_locale(&self, chat_id: i64) -> Result<Option<String>> {
+        self.get_user_data(chat_id, "lang").await
     }
 
     pub(crate) async fn set_locale(&self, chat_id: i64, lang: &str) -> Result<()> {
-        let key = format!("chat:{}", chat_id);
-        self.connection()
-            .hset(&key, "lang", lang)
-            .await
-            .map_err(|e| e.into())
+        self.store_user_data(chat_id, "lang", lang).await
     }
 
     pub(crate) async fn get_auto_search_enabled(&self, chat_id: i64) -> Result<bool> {
-        let key = format!("chat:{}", chat_id);
-        self.connection()
-            .hget(&key, "auto_search_enabled")
-            .await
-            .map_err(|e| e.into())
+        match self.get_user_data(chat_id, "auto_search_enabled").await {
+            Ok(Some(enabled)) => Ok(enabled),
+            Ok(None) => Ok(true),
+            Err(e) => Err(e),
+        }
     }
 
     pub(crate) async fn set_auto_search_enabled(&self, chat_id: i64, enabled: bool) -> Result<()> {
-        let key = format!("chat:{}", chat_id);
-        self.connection()
-            .hset(&key, "auto_search_enabled", enabled)
+        self.store_user_data(chat_id, "auto_search_enabled", enabled)
             .await
-            .map_err(|e| e.into())
     }
 
     pub(crate) async fn get_no_result_count(&self, chat_id: i64) -> Result<i64> {
-        let key = format!("chat:{}", chat_id);
-        self.connection()
-            .hget(&key, "no_result_count")
-            .await
-            .map_err(|e| e.into())
+        match self.get_user_data(chat_id, "no_result_count").await {
+            Ok(Some(count)) => Ok(count),
+            Ok(None) => Ok(0),
+            Err(e) => Err(e),
+        }
     }
 
-    pub(crate) async fn set_no_result_count(&self, chat_id: i64, count: i64) -> Result<i64> {
-        let key = format!("chat:{}", chat_id);
-        self.connection()
-            .hset(&key, "no_result_count", count)
+    pub(crate) async fn set_no_result_count(&self, chat_id: i64, count: i64) -> Result<()> {
+        self.store_user_data(chat_id, "no_result_count", count)
             .await
-            .map_err(|e| e.into())
     }
 
     pub(crate) async fn inc_no_result_count(&self, chat_id: i64) -> Result<i64> {
