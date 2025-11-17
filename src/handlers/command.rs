@@ -209,17 +209,13 @@ async fn handle_autosearch_message(bot: Bot, msg: Message) -> Result<()> {
         Ok(enabled) => match redis.set_auto_search_enabled(chat_id, !enabled).await {
             Ok(_) => {
                 let _ = redis.set_no_result_count(msg.chat.id.0, 0).await;
-                let status = if enabled { "✅" } else { "❌" };
-                bot.send_message(
-                    msg.chat.id,
-                    t!(
-                        "message.auto_search_status",
-                        locale = language,
-                        status = status
-                    )
-                    .as_ref(),
-                )
-                .await?;
+                let key = if !enabled {
+                    "message.auto_search_status_enabled"
+                } else {
+                    "message.auto_search_status_disabled"
+                };
+                bot.send_message(msg.chat.id, t!(key, locale = language).as_ref())
+                    .await?;
             }
             Err(err) => {
                 log::error!("Failed to set auto search status: {}", err);

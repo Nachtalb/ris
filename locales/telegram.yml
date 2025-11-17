@@ -459,15 +459,24 @@ message.auto_search_disabled:
   es: 'Se han alcanzado %{limit} búsquedas consecutivas sin resultados. Búsqueda automática desactivada.'
   weeb: "%{limit} straight-up blank searches, senpai—auto-hunt's on cooldown like a busted Sharingan!"
   archaic: 'Thou hast reached %{limit} successive inquiries void of yield. The questing by itself is now withholden.'
-message.auto_search_status:
-  en: 'Auto search status: %{status}'
-  ru: 'Статус автоматического поиска: %{status}'
-  de: 'Automatische Suche: %{status}'
-  ch: 'Auto-Suechi: %{status}'
-  cn: '自动搜索状态： %{status}'
-  es: 'Estado de la búsqueda automática: %{status}'
-  weeb: 'Auto-hunt status: %{status}'
-  archaic: "The questing's state: %{status}, as the state of the kingdom under Solomon."
+message.auto_search_status_enabled:
+  en: 'Auto search status enabled'
+  ru: 'Автоматический поиск включен'
+  de: 'Automatische Suche aktiviert'
+  ch: 'Auto-Suechi aktiviert'
+  cn: '自动搜索已启用'
+  es: 'Búsqueda automática activada'
+  weeb: 'Auto-hunt is on, senpai!'
+  archaic: 'The questing by itself is now granted.'
+message.auto_search_status_disabled:
+  en: 'Auto search status disabled'
+  ru: 'Автоматический поиск отключен'
+  de: 'Automatische Suche deaktiviert'
+  ch: 'Auto-Suechi usgschalte'
+  cn: '自动搜索已禁用'
+  es: 'Búsqueda automática desactivada'
+  weeb: 'Auto-hunt is off, senpai!'
+  archaic: 'The questing by itself is now withholden.'
 message.error_occurred:
   en: 'Error occurred'
   ru: 'Произошла ошибка'
