@@ -138,10 +138,34 @@ impl Redis {
             .map_err(|e| e.into())
     }
 
+    pub(crate) async fn get_auto_search_enabled(&self, chat_id: i64) -> Result<bool> {
+        let key = format!("chat:{}", chat_id);
+        self.connection()
+            .hget(&key, "auto_search_enabled")
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn set_auto_search_enabled(&self, chat_id: i64, enabled: bool) -> Result<()> {
+        let key = format!("chat:{}", chat_id);
+        self.connection()
+            .hset(&key, "auto_search_enabled", enabled)
+            .await
+            .map_err(|e| e.into())
+    }
+
     pub(crate) async fn get_no_result_count(&self, chat_id: i64) -> Result<i64> {
         let key = format!("chat:{}", chat_id);
         self.connection()
             .hget(&key, "no_result_count")
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn set_no_result_count(&self, chat_id: i64, count: i64) -> Result<i64> {
+        let key = format!("chat:{}", chat_id);
+        self.connection()
+            .hset(&key, "no_result_count", count)
             .await
             .map_err(|e| e.into())
     }

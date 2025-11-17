@@ -11,6 +11,7 @@ use teloxide::{
 use crate::{
     config::get_config,
     handlers::media,
+    redis::get_redis,
     utils::{LangSource, get_chat_lang, set_chat_lang},
 };
 
@@ -28,6 +29,8 @@ pub(crate) enum Command {
     Search,
     #[command(description = "Set language", alias = "lang")]
     Language,
+    #[command(description = "Toggle Auto Search", alias = "auto")]
+    AutoSearch,
 }
 
 async fn handle_search_message(bot: Bot, msg: Message) -> Result<()> {
@@ -186,12 +189,67 @@ async fn language_handle_set(
     Ok(())
 }
 
+async fn handle_autosearch_message(bot: Bot, msg: Message) -> Result<()> {
+    let config = get_config();
+    let language = get_chat_lang(LangSource::Message(&msg)).await;
+    let redis = get_redis().await;
+    let chat_id = msg.chat.id.0;
+
+    if redis.is_none() || config.general.empty_search_limit.unwrap() == 0 {
+        bot.send_message(
+            msg.chat.id,
+            t!("message.auto_search_disabled", locale = language).as_ref(),
+        )
+        .await?;
+        return Ok(());
+    }
+    let redis = redis.as_ref().unwrap();
+
+    match redis.get_auto_search_enabled(chat_id).await {
+        Ok(enabled) => match redis.set_auto_search_enabled(chat_id, !enabled).await {
+            Ok(_) => {
+                let _ = redis.set_no_result_count(msg.chat.id.0, 0).await;
+                let status = if enabled { "✅" } else { "❌" };
+                bot.send_message(
+                    msg.chat.id,
+                    t!(
+                        "message.auto_search_status",
+                        locale = language,
+                        status = status
+                    )
+                    .as_ref(),
+                )
+                .await?;
+            }
+            Err(err) => {
+                log::error!("Failed to set auto search status: {}", err);
+                bot.send_message(
+                    msg.chat.id,
+                    t!("message.error_occurred", locale = language).as_ref(),
+                )
+                .await?;
+            }
+        },
+        _ => {
+            log::error!("Failed to get auto search status");
+            bot.send_message(
+                msg.chat.id,
+                t!("message.error_occurred", locale = language).as_ref(),
+            )
+            .await?;
+        }
+    }
+
+    Ok(())
+}
+
 async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> Result<()> {
     match cmd {
         Command::Start => handle_start_message(bot, msg).await?,
         Command::Help => handle_help_message(bot, msg).await?,
         Command::Search => handle_search_message(bot, msg).await?,
         Command::Language => handle_language_message(bot, msg).await?,
+        Command::AutoSearch => handle_autosearch_message(bot, msg).await?,
     };
 
     Ok(())

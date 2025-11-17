@@ -196,6 +196,7 @@ message.start:
     - /help: Tips and tricks for better search results
     - /search: Reply to an image / video to search
     - /lang: Change language
+    - /auto: Toggle auto search
 
     👨‍💻 <u>Admin</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -217,6 +218,7 @@ message.start:
     - /help: Советы и хитрости для лучших результатов поиска
     - /search: Ответить на изображение / видео для поиска
     - /lang: Сменить язык
+    - /auto: Переключить автоматический поиск
 
     👨‍💻 <u>Админ</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -238,6 +240,7 @@ message.start:
     - /help: Tipps und Tricks für bessere Suchergebnisse
     - /search: Antworte auf ein Bild / Video zum Suchen
     - /lang: Sprache wechseln
+    - /auto: Auto-Suche ein-/ausschalten
 
     👨‍💻 <u>Admin</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -259,6 +262,7 @@ message.start:
     - /help: Tipps und Trick zu bessre Suchresultat
     - /search: Antworte uf es Bild / Video zum Sueche
     - /lang: Sprache ändere
+    - /auto: Auto-Suechi ii-/usschalte
 
     👨‍💻 <u>Admin</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -278,6 +282,7 @@ message.start:
     - /help: 更好的搜索结果的提示和技巧
     - /search: 回复图像 / 视频进行搜索
     - /lang: 更改语言
+    - /auto: 切换自动搜索
 
     👨‍💻 <u>管理员</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -297,6 +302,7 @@ message.start:
     - /help: Consejos y trucos para mejores resultados de búsqueda
     - /search: Responder a una imagen / video para buscar
     - /lang: Cambiar idioma
+    - /auto: Encender / apagar la busqueda automática
 
     👨‍💻 <u>Admin</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -316,6 +322,7 @@ message.start:
     - /help: Hacks for max similarity scores
     - /search: Reply to media for that deep dive
     - /lang: Switch to your native tongue (or loli-speak?)
+    - /auto: Toggle hunt mode
 
     👨‍💻 <u>Creator Senpai</u>
     Nachtalb: <a href="https://github.com/Nachtalb">GitHub</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -335,6 +342,7 @@ message.start:
     - /help: Counsels and wiles for truer findings
     - /search: Reply to an image or vision to pursue
     - /lang: Alter the tongue of utterance
+    - /auto: Toggle autonomous questing
 
     👨‍💻 <u>The Scribe</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -449,5 +457,23 @@ message.auto_search_disabled:
   ch: '%{limit} aufenangfougendi Suechine ohni Ergäbniss erreicht. Auto-Suechi usgschalte.'
   cn: '已达到 %{limit} 次连续无结果搜索。自动搜索已禁用。'
   es: 'Se han alcanzado %{limit} búsquedas consecutivas sin resultados. Búsqueda automática desactivada.'
-  we: "%{limit} straight-up blank searches, senpai—auto-hunt's on cooldown like a busted Sharingan!"
+  weeb: "%{limit} straight-up blank searches, senpai—auto-hunt's on cooldown like a busted Sharingan!"
   archaic: 'Thou hast reached %{limit} successive inquiries void of yield. The questing by itself is now withholden.'
+message.auto_search_status:
+  en: 'Auto search status: %{status}'
+  ru: 'Статус автоматического поиска: %{status}'
+  de: 'Automatische Suche: %{status}'
+  ch: 'Auto-Suechi: %{status}'
+  cn: '自动搜索状态： %{status}'
+  es: 'Estado de la búsqueda automática: %{status}'
+  weeb: 'Auto-hunt status: %{status}'
+  archaic: "The questing's state: %{status}, as the state of the kingdom under Solomon."
+message.error_occurred:
+  en: 'Error occurred'
+  ru: 'Произошла ошибка'
+  de: 'Fehler aufgetreten'
+  ch: 'Error occurred'
+  cn: '出错了'
+  es: 'Error occurred'
+  weeb: 'Error occurred'
+  archaic: 'The error occurred, as the state of the kingdom under Solomon.'
